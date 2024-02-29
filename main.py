@@ -2,46 +2,50 @@ import optuna
 import pandas as pd
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.layers import Dense, Dropout,Input
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
-
 # importing the data set
-data_url = ""
+data_url = "./machine_components_data.csv"
 data_set = pd.read_csv(data_url)
 
-# expected inputs and outputs
-expected_inputs = ""
-expected_output = ""
+data = pd.read_csv("./machine_components_data.csv")
+#print(data.columns)
 
-# make the test and training data
-(test_input, test_output), (train_input, train_output) = train_test_split(expected_inputs, expected_output,
-                                                                          test_size=.2, random_state=42)
-# making the ANN models for finding the regression
-def objective(trail):
-    num_layers = trail.suggest_int('num_layers', 1, 10)
-    num_nodes = trail.suggest_int('num_nodes', 16, 128)
-    dropout_rate = trail.suggest_int('dropout_rate', 0.0, 0.5)
-    learning_rate = trail.suggest_logunifrom('learning_rate', 1e-5, 1e2)
+columns_to_drop_output = ['Capacity', 'Failure_Rate', 'Setup_Time', 'Quality_Parameter']
+expected_output = data.drop(columns_to_drop_output, axis=1)
+
+#print(expected_output.columns)
+
+columns_to_drop_input = ['Processing_Time', 'Maintenance_Interval', 'Maintenance_Duration', 
+                          'Failure_Rate', 'Energy_Consumption', 'Availability']
+expected_input = data.drop(columns_to_drop_input, axis=1)
+
+#print(expected_input.columns)
+
+train_input, test_input, train_output, test_output = train_test_split(expected_input, expected_output,
+                                                                      test_size=.2, random_state=42)
+def objective(trial):
+    num_layers = trial.suggest_int('num_layers', 1, 10)
+    num_nodes = trial.suggest_int('num_nodes', 16, 128)
+    dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
+    learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-2)
 
     model = Sequential()
-    model.add(len(expected_inputs))
+    model.add(Dense(num_nodes, input_dim=len(expected_input.columns), activation='relu'))
     for _ in range(num_layers):
         model.add(Dense(num_nodes, activation='relu'))
         model.add(Dropout(dropout_rate))
-    model.add(Dense(expected_output, activation='softmax'))
+    model.add(Dense(1, activation='linear'))  # Linear activation for regression
 
     model.compile(optimizer=Adam(learning_rate),
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
-
+                  loss='mean_squared_error',  # Use appropriate loss for regression
+                  metrics=['mean_absolute_error'])  # MAE as metric for regression
+    model.summary
     model.fit(train_input, train_output, epochs=5, validation_split=0.2, verbose=0)
-    model.summary()
-    val_loss, val_acc = model.evaluate(test_input, test_output, verbose=0)
-    plt.plot(val_loss)
-    plt.plot(val_acc)
-    plt.show()
-    return val_acc
+    # Get the validation loss and MAE
+    val_loss, val_mae = model.evaluate(test_input, test_output, verbose=0)
+    return val_mae  # Return MAE as the objective to minimize
 
 
 study = optuna.create_study(direction='maximize')
@@ -50,8 +54,14 @@ study.optimize(objective, n_trials = 10)
 best_params = study.best_params
 print("Best hyper-parameters : ", best_params)
 
+# Define the input layer with appropriate input shape
+input_layer = Input(shape=(len(expected_input.columns),))
+
+# Add the input layer to the model
+
+
 best_model = Sequential()
-best_model.add(len(expected_inputs))
+best_model.add(Dense(best_params['num_nodes'], activation='relu', input_shape=(len(expected_input.columns),)))
 for _ in range(best_params['num_layers']):
     best_model.add(Dense(best_params['num_nodes'], activation='relu'))
     best_model.add(Dropout(best_params['dropout_rate']))
@@ -70,5 +80,5 @@ plt.show()
 
 print("Test accuracy:", test_acc)
 
-best_model.Predict(test_input)
+#best_model.Predict(test_input)
 
