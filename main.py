@@ -5,6 +5,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout,Input
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 # importing the data set
 data_url = "./machine_components_data.csv"
 data_set = pd.read_csv(data_url)
@@ -57,19 +58,17 @@ print("Best hyper-parameters : ", best_params)
 # Define the input layer with appropriate input shape
 input_layer = Input(shape=(len(expected_input.columns),))
 
-# Add the input layer to the model
-
-
 best_model = Sequential()
-best_model.add(Dense(best_params['num_nodes'], activation='relu', input_shape=(len(expected_input.columns),)))
+best_model.add(Dense(best_params['num_nodes'], input_dim=len(expected_input.columns), activation='relu'))
 for _ in range(best_params['num_layers']):
     best_model.add(Dense(best_params['num_nodes'], activation='relu'))
     best_model.add(Dropout(best_params['dropout_rate']))
-best_model.add(Dense(expected_output, activation='softmax'))
+best_model.add(Dense(len(expected_output.columns), activation='softmax'))
 best_model.compile(optimizer=Adam(best_params['learning_rate']),
                    loss='sparse_categorical_crossentropy',
                    metrics=['accuracy'])
-best_model.fit(train_input, train_output, epochs=10, validation_split=0.2)
+train_output_encoded = LabelEncoder.fit_transform(train_output)
+best_model.fit(train_input, train_output_encoded, epochs=10, validation_split=0.2)
 best_model.summary()
 best_model.save('best_model.h5')
 test_loss, test_acc = best_model.evaluate(test_input, test_output)
