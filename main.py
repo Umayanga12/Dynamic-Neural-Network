@@ -7,6 +7,7 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from keras.losses import categorical_crossentropy
+from tensorflow.keras.models import load_model
 # importing the data set
 data_url = "./machine_components_data.csv"
 data_set = pd.read_csv(data_url)
@@ -80,3 +81,8 @@ test_loss, test_acc = best_model.evaluate(test_input, test_output)
 print("Test accuracy:", test_acc)
 print(best_model.predict(test_input))
 
+#loaded_model = load_model('best_model.h5')
+
+# predictions = loaded_model.predict()
+
+# print(predictions)
