@@ -7,7 +7,7 @@ from tensorflow.keras.layers import Dense, Dropout,Input
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from keras.losses import categorical_crossentropy
+from keras.losses import mean_squared_error
 from tensorflow.keras.models import load_model
 
 def text_speech(text: str)->None:
@@ -15,24 +15,21 @@ def text_speech(text: str)->None:
     engine.say(text)
     engine.runAndWait()
 
-# importing the data set
 data_url = "./machine_components_data.csv"
 data_set = pd.read_csv(data_url)
 
 data = pd.read_csv("./machine_components_data.csv")
-#print(data.columns)
+
 text_speech("Loading and reading the data set....")
 
 columns_to_drop_output = ['Capacity', 'Failure_Rate', 'Setup_Time', 'Quality_Parameter']
 expected_output = data.drop(columns_to_drop_output, axis=1)
 
-#print(expected_output.columns)
-
 columns_to_drop_input = ['Processing_Time', 'Maintenance_Interval', 'Maintenance_Duration', 
                           'Failure_Rate', 'Energy_Consumption', 'Availability']
 expected_input = data.drop(columns_to_drop_input, axis=1)
 
-#print(expected_input.columns)
+
 
 train_input, test_input, train_output, test_output = train_test_split(expected_input, expected_output,
                                                                       test_size=.2, random_state=42)
@@ -49,20 +46,18 @@ def objective(trial):
     for _ in range(num_layers):
         model.add(Dense(num_nodes, activation='relu'))
         model.add(Dropout(dropout_rate))
-    model.add(Dense(1, activation='linear'))  # Linear activation for regression
+    model.add(Dense(len(expected_output.columns), activation='linear')) 
 
     model.compile(optimizer=Adam(learning_rate),
-                  loss='mean_squared_error',  # Use appropriate loss for regression
-                  metrics=['mean_absolute_error'])  # MAE as metric for regression
-   # model.summary()
+                  loss='mean_squared_error',  
+                  metrics=['mean_absolute_error'])  
     model.fit(train_input, train_output, epochs=5, validation_split=0.2, verbose=0)
-    # Get the validation loss and MAE
     val_loss, val_mae = model.evaluate(test_input, test_output, verbose=0)
-    return val_mae  # Return MAE as the objective to minimize
+    return val_mae 
 
 
 study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials = 10)
+study.optimize(objective, n_trials = 25)
 
 best_params = study.best_params
 print("Best hyper-parameters : ", best_params)
@@ -72,14 +67,14 @@ best_model.add(Input(shape=(len(expected_input.columns),)))
 for _ in range(best_params['num_layers']):
     best_model.add(Dense(best_params['num_nodes'], activation='relu'))
     best_model.add(Dropout(best_params['dropout_rate']))
-best_model.add(Dense(len(expected_output.columns), activation='softmax'))
+best_model.add(Dense(len(expected_output.columns), activation='linear'))
 
 text_speech("Compiling the models...")
-best_model.compile(optimizer ='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+best_model.compile(optimizer ='adam', loss='mean_squared_error', metrics=['mean_absolute_error'])
 
 
 text_speech("Start traning...")
-best_model.fit(train_input, train_output, epochs=10, validation_split=0.2)
+best_model.fit(train_input, train_output, epochs=100, validation_split=0.2)
 best_model.summary()
 text_speech("Evaluating the model ....")
 test_loss, test_acc = best_model.evaluate(test_input, test_output)
