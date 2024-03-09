@@ -6,7 +6,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout,Input
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from keras.losses import mean_squared_error
 from tensorflow.keras.models import load_model
 
@@ -29,24 +29,25 @@ columns_to_drop_input = ['Processing_Time', 'Maintenance_Interval', 'Maintenance
                           'Failure_Rate', 'Energy_Consumption', 'Availability']
 expected_input = data.drop(columns_to_drop_input, axis=1)
 
+scaler = StandardScaler()
+expected_input_scaled = scaler.fit_transform(expected_input)
 
-
-train_input, test_input, train_output, test_output = train_test_split(expected_input, expected_output,
+train_input, test_input, train_output, test_output = train_test_split(expected_input_scaled, expected_output,
                                                                       test_size=.2, random_state=42)
 
 text_speech("Start creating and fine tuning the neural networks for best model architecture....")
 def objective(trial):
     num_layers = trial.suggest_int('num_layers', 1, 10)
     num_nodes = trial.suggest_int('num_nodes', 16, 128)
-    dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
-    learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-2)
+    dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 1.0)
+    learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 1e-1)
 
     model = Sequential()
     model.add(Input(shape=(len(expected_input.columns),)))
     for _ in range(num_layers):
         model.add(Dense(num_nodes, activation='relu'))
         model.add(Dropout(dropout_rate))
-    model.add(Dense(len(expected_output.columns), activation='linear')) 
+    model.add(Dense(len(expected_output.columns), activation='sigmoid')) 
 
     model.compile(optimizer=Adam(learning_rate),
                   loss='mean_squared_error',  
@@ -67,7 +68,7 @@ best_model.add(Input(shape=(len(expected_input.columns),)))
 for _ in range(best_params['num_layers']):
     best_model.add(Dense(best_params['num_nodes'], activation='relu'))
     best_model.add(Dropout(best_params['dropout_rate']))
-best_model.add(Dense(len(expected_output.columns), activation='linear'))
+best_model.add(Dense(len(expected_output.columns), activation='sigmoid'))
 
 text_speech("Compiling the models...")
 best_model.compile(optimizer ='adam', loss='mean_squared_error', metrics=['mean_absolute_error'])
@@ -79,7 +80,7 @@ best_model.summary()
 text_speech("Evaluating the model ....")
 test_loss, test_acc = best_model.evaluate(test_input, test_output)
 text_speech("Saving the trained model...")
-best_model.save('best_model.h5')
+#best_model.save('best_model.h5')
 
 print("Test accuracy:", test_acc)
 text_speech("Test accuracy will be" + str(test_acc))
